@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.spec
+
+# PyInstaller output
+build/
+dist/
+
+# App runtime files (personal data)
+settings.json
+stats.json
+
+# Games folder contents (user images)
+games/*
+!games/.gitkeep
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.claude/
