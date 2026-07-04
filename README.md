@@ -1,7 +1,11 @@
 # Demi-God Gamer Gauntlet
-Inspiration was taken from the Content Creator Ludwig. Originally is version was the "God Gamer Gauntlet" and featured 10 games. I made this app to support 5 games hence why it's called the Demi-God-Gamer-Gauntlet. Though now I've adapted to support 2-15 games. 
+Inspiration was taken from the Content Creator Ludwig. Originally is version was the "God Gamer Gauntlet" and featured 10 games. I made this app to support 5 games hence why it's called the Demi-God-Gamer-Gauntlet. Though now I've adapted to support 2-15 games.
+
 A speedrun-style challenge tracker for multi-game gauntlets. Track your progress across 2–15 games, count your resets, time your runs, and pull cover art automatically from IGDB.
+
+
 Disclaimer: Claude wrote all of this. I just provided the ideas. Feel free to edit, fork, or make it better.
+
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue) ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey) ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
