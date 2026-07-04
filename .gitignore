@@ -7,13 +7,8 @@ __pycache__/
 build/
 dist/
 
-# App runtime files (personal data)
-settings.json
-stats.json
-
-# Games folder contents (user images)
-games/*
-!games/.gitkeep
+# App runtime data (auto-created, contains personal settings/stats)
+dggg-data/
 
 # IDE / OS
 .vscode/

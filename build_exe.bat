@@ -10,7 +10,6 @@ echo Building DGGG.exe ...
     --onefile ^
     --windowed ^
     --name "DGGG" ^
-    --add-data "games;games" ^
     main.py
 
 echo.

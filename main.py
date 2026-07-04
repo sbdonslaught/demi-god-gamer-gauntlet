@@ -32,9 +32,9 @@ if getattr(sys, "frozen", False):
 else:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-GAMES_DIR     = os.path.join(SCRIPT_DIR, "games")
-SETTINGS_FILE = os.path.join(SCRIPT_DIR, "settings.json")
-STATS_FILE    = os.path.join(SCRIPT_DIR, "stats.json")
+DATA_DIR      = os.path.join(SCRIPT_DIR, "dggg-data")
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+STATS_FILE    = os.path.join(DATA_DIR, "stats.json")
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -230,6 +230,7 @@ class App:
             return dict(default)
 
     def _save_json(self, path: str, data: dict) -> None:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
@@ -245,28 +246,17 @@ class App:
     # ── Images ────────────────────────────────────────────────────────────────
 
     def _load_images(self) -> None:
-        os.makedirs(GAMES_DIR, exist_ok=True)
-        for i in range(15):
-            self.pil_images[i] = self._load_single_image(i)
-
-    def _load_single_image(self, slot: int) -> Image.Image:
-        for ext in ("png", "jpg", "jpeg", "webp", "bmp", "gif"):
-            path = os.path.join(GAMES_DIR, f"{slot + 1}.{ext}")
-            if os.path.exists(path):
-                try:
-                    return Image.open(path).convert("RGB")
-                except Exception:
-                    pass
-        # Placeholder — portrait shaped
+        os.makedirs(DATA_DIR, exist_ok=True)
         shades = [
             (50, 40, 120), (40, 70, 140), (60, 30, 110), (30, 60, 130), (55, 45, 115),
             (45, 55, 125), (35, 65, 135), (65, 35, 105), (25, 55, 125), (50, 50, 110),
             (42, 48, 118), (38, 62, 132), (58, 32, 108), (28, 58, 128), (52, 42, 112),
         ]
-        return Image.new("RGB", (264, 374), shades[slot % len(shades)])
+        for i in range(15):
+            self.pil_images[i] = Image.new("RGB", (264, 374), shades[i % len(shades)])
 
     def _fetch_igdb_images_bg(self) -> None:
-        """On startup, fetch any IGDB covers that have no local file yet."""
+        """On startup, fetch all IGDB covers that have a stored image_id."""
         if not REQUESTS_OK:
             return
         cid = self.settings.get("igdb_client_id", "").strip()
@@ -279,13 +269,6 @@ class App:
         client = IgdbClient(cid, cs)
         for slot, image_id in enumerate(image_ids):
             if not image_id:
-                continue
-            # Only fetch if there's no local file already in place
-            has_local = any(
-                os.path.exists(os.path.join(GAMES_DIR, f"{slot + 1}.{ext}"))
-                for ext in ("png", "jpg", "jpeg", "webp", "bmp", "gif")
-            )
-            if has_local:
                 continue
             def _fetch(s=slot, iid=image_id):
                 try:

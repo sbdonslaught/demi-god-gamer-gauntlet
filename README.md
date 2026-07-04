@@ -1,6 +1,10 @@
 # Demi-God Gamer Gauntlet
+Inspiration was taken from the Content Creator Ludwig. Originally is version was the "God Gamer Gauntlet" and featured 10 games. I made this app to support 5 games hence why it's called the Demi-God-Gamer-Gauntlet. Though now I've adapted to support 2-15 games.
 
 A speedrun-style challenge tracker for multi-game gauntlets. Track your progress across 2–15 games, count your resets, time your runs, and pull cover art automatically from IGDB.
+
+
+Disclaimer: Claude wrote all of this. I just provided the ideas. Feel free to edit, fork, or make it better.
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue) ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey) ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -65,8 +69,6 @@ build_exe.bat
 
 Output: `dist\DGGG.exe`
 
-> When distributing, place the `games\` folder next to the exe.
-
 ---
 
 ## IGDB Cover Art Setup
@@ -75,12 +77,6 @@ Output: `dist\DGGG.exe`
 2. Copy your **Client ID** and **Client Secret**
 3. Open **Settings** inside the app and paste them under **IGDB Credentials**
 4. Use the **🔍 IGDB** button next to each game slot to search and assign cover art
-
----
-
-## Custom Game Images (manual)
-
-Place images in the `games\` folder named `1.png`, `2.png`, … `15.png` (supports png, jpg, jpeg, webp, bmp, gif).
 
 ---
 
@@ -125,9 +121,9 @@ DGGG App/
 ├── launch.bat         # Batch launcher (pythonw)
 ├── build_exe.bat      # PyInstaller build script
 ├── requirements.txt
-├── games/             # Drop custom images here (1.png–15.png)
-├── settings.json      # Auto-created on first run
-└── stats.json         # Auto-created on first run
+└── dggg-data/         # Auto-created on first run (settings & stats)
+    ├── settings.json
+    └── stats.json
 ```
 
 ---
