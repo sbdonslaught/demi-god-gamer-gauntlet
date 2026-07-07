@@ -87,10 +87,12 @@ DEFAULT_SETTINGS: dict = {
 }
 
 DEFAULT_STATS: dict = {
-    "timer_seconds": 0.0,
-    "reset_count":   0,
-    "current_game":  -1,
-    "game_state":    "idle",
+    "timer_seconds":       0.0,
+    "reset_count":         0,
+    "current_game":        -1,
+    "game_state":          "idle",
+    "game_splits":         [0.0] * 15,
+    "current_run_seconds": 0.0,
 }
 
 CONFETTI_COLORS = [
@@ -99,6 +101,11 @@ CONFETTI_COLORS = [
 ]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _fmt_time(seconds: float) -> str:
+    h, rem = divmod(int(seconds), 3600)
+    m, s   = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
 
 def display_key(key: str) -> str:
     k = key.strip("<>")
@@ -209,6 +216,15 @@ class App:
         self._timer_job:    str|None   = None
         self._bound_keys:   list[str]  = []
 
+        self._current_run_elapsed: float      = float(self.stats.get("current_run_seconds", 0.0))
+        self._current_run_base:    float      = self._current_run_elapsed
+        self._current_run_start:   float|None = None
+
+        splits = self.stats.get("game_splits", [])
+        while len(splits) < 15:
+            splits.append(0.0)
+        self.stats["game_splits"] = splits
+
         self.pil_images: list[Image.Image|None] = [None] * 15
         self._load_images()
         self._build_ui()
@@ -238,9 +254,10 @@ class App:
         self._save_json(SETTINGS_FILE, self.settings)
 
     def _save_stats(self) -> None:
-        self.stats["timer_seconds"] = self._elapsed
-        self.stats["current_game"]  = self.current_game
-        self.stats["game_state"]    = self.game_state
+        self.stats["timer_seconds"]       = self._elapsed
+        self.stats["current_game"]        = self.current_game
+        self.stats["game_state"]          = self.game_state
+        self.stats["current_run_seconds"] = self._current_run_elapsed
         self._save_json(STATS_FILE, self.stats)
 
     # ── Images ────────────────────────────────────────────────────────────────
@@ -311,6 +328,12 @@ class App:
             name = names[i] if i < len(names) else f"Game {i + 1}"
             gf["num"].configure(text=name, bg=bg, fg=tcolor,
                                 font=("Segoe UI", tsize, "bold"))
+
+            splits = self.stats.get("game_splits", [])
+            if state == "done" and i < len(splits) and splits[i] > 0:
+                gf["split_lbl"].configure(text=_fmt_time(splits[i]), bg=bg)
+            else:
+                gf["split_lbl"].configure(text="", bg=bg)
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
@@ -385,8 +408,13 @@ class App:
             self._stats_bar, text="↺  Resets: 0",
             font=("Segoe UI", rsize, "bold"), fg=rcolor, bg=bg,
         )
+        self.current_run_lbl = tk.Label(
+            self._stats_bar, text="🎮  Run: 00:00:00",
+            font=("Consolas", tsize, "bold"), fg="#a29bfe", bg=bg,
+        )
         self.timer_lbl.pack(side="left", padx=(0, 20))
-        self.resets_lbl.pack(side="left")
+        self.resets_lbl.pack(side="left", padx=(0, 20))
+        # current_run_lbl packed conditionally in _refresh_stats
 
         # Images row
         self._img_row = tk.Frame(self._content, bg=bg)
@@ -412,9 +440,11 @@ class App:
             num    = tk.Label(col, text=f"Game {i + 1}",
                               font=("Segoe UI", 9, "bold"), fg="#555577", bg=bg)
             num.pack(pady=(3, 0))
+            split_lbl = tk.Label(col, text="", font=("Consolas", 8), fg="#55aa55", bg=bg)
+            split_lbl.pack()
             self.game_frames.append({
                 "col": col, "border": border, "inner": inner,
-                "label": lbl, "num": num, "_photo": None,
+                "label": lbl, "num": num, "split_lbl": split_lbl, "_photo": None,
             })
 
     def _theme_widgets(self) -> list:
@@ -422,9 +452,9 @@ class App:
             [self.root, self._top, self._title_lbl, self._right,
              self._status_bar, self.status_lbl,
              self._content, self._stats_bar,
-             self.timer_lbl, self.resets_lbl, self._img_row]
+             self.timer_lbl, self.resets_lbl, self.current_run_lbl, self._img_row]
             + [w for gf in self.game_frames
-               for w in (gf["col"], gf["border"], gf["inner"], gf["label"], gf["num"])]
+               for w in (gf["col"], gf["border"], gf["inner"], gf["label"], gf["num"], gf["split_lbl"])]
         )
 
     def _apply_theme(self) -> None:
@@ -452,12 +482,20 @@ class App:
         self.timer_lbl.configure(text=f"⏱  {h:02d}:{m:02d}:{s:02d}")
         self.resets_lbl.configure(text=f"↺  Resets: {self.stats.get('reset_count', 0)}")
 
+        cr = self._current_run_elapsed
+        crh, crrem = divmod(int(cr), 3600)
+        crm, crs   = divmod(crrem, 60)
+        self.current_run_lbl.configure(text=f"🎮  Run: {crh:02d}:{crm:02d}:{crs:02d}")
+
         self.timer_lbl.pack_forget()
         self.resets_lbl.pack_forget()
+        self.current_run_lbl.pack_forget()
         if self.settings.get("timer_on", True):
             self.timer_lbl.pack(side="left", padx=(0, 20))
         if self.settings.get("reset_count_on", True):
-            self.resets_lbl.pack(side="left")
+            self.resets_lbl.pack(side="left", padx=(0, 20))
+        if self.settings.get("timer_keep_on_reset", False) and self.game_state in ("running", "paused"):
+            self.current_run_lbl.pack(side="left")
 
     def _restore_status(self) -> None:
         gs, cg = self.game_state, self.current_game
@@ -468,7 +506,7 @@ class App:
             name = names[cg] if 0 <= cg < len(names) else f"Game {cg + 1}"
             self._set_status(f"Paused  —  {name}  (restored from last session)")
         elif gs == "done":
-            self._set_status("All 5 games complete! \U0001f389")
+            self._set_status(f"All {self.num_games} games complete! \U0001f389")
 
     def _set_status(self, text: str) -> None:
         self.status_lbl.configure(text=text)
@@ -476,8 +514,11 @@ class App:
     # ── Timer ─────────────────────────────────────────────────────────────────
 
     def _start_timer(self) -> None:
-        self._elapsed_base = self._elapsed
-        self._timer_start  = time.monotonic()
+        now = time.monotonic()
+        self._elapsed_base      = self._elapsed
+        self._timer_start       = now
+        self._current_run_base  = self._current_run_elapsed
+        self._current_run_start = now
         if self._timer_job is not None:
             self.root.after_cancel(self._timer_job)
         self._tick()
@@ -486,15 +527,22 @@ class App:
         if self._timer_job is not None:
             self.root.after_cancel(self._timer_job)
             self._timer_job = None
+        now = time.monotonic()
         if self._timer_start is not None:
-            self._elapsed     = self._elapsed_base + (time.monotonic() - self._timer_start)
+            self._elapsed     = self._elapsed_base + (now - self._timer_start)
             self._timer_start = None
+        if self._current_run_start is not None:
+            self._current_run_elapsed = self._current_run_base + (now - self._current_run_start)
+            self._current_run_start   = None
         self._save_stats()
 
     def _tick(self) -> None:
         if self.game_state != "running":
             return
-        self._elapsed = self._elapsed_base + (time.monotonic() - self._timer_start)
+        now = time.monotonic()
+        self._elapsed = self._elapsed_base + (now - self._timer_start)
+        if self._current_run_start is not None:
+            self._current_run_elapsed = self._current_run_base + (now - self._current_run_start)
         self._refresh_stats()
         self._save_stats()
         self._timer_job = self.root.after(1000, self._tick)
@@ -549,14 +597,28 @@ class App:
         else:
             self.cmd_next()
 
+    def _record_split(self, game_index: int) -> None:
+        splits = self.stats.get("game_splits", [0.0] * 15)
+        prior  = sum(splits[:game_index])
+        splits[game_index] = max(0.0, self._elapsed - prior)
+        self.stats["game_splits"] = splits
+        self._save_stats()
+
     def cmd_next(self) -> None:
         if self.game_state not in ("running", "paused"):
             return
+        # Record split for the game just completed
+        self._record_split(self.current_game)
+        # Reset current run timer for next game
+        self._current_run_elapsed = 0.0
+        self._current_run_base    = 0.0
+        self._current_run_start   = time.monotonic() if self.game_state == "running" else None
+
         if self.current_game >= self.num_games - 1:
             self.game_state = "done"
             self._pause_timer()
             self._refresh_images()
-            self._set_status("All 5 games complete! \U0001f389")
+            self._set_status(f"All {self.num_games} games complete! \U0001f389")
             self._launch_confetti()
         else:
             self.current_game += 1
@@ -588,21 +650,32 @@ class App:
         keep = self.settings.get("timer_keep_on_reset", False)
         self.stats["reset_count"] = self.stats.get("reset_count", 0) + 1
 
+        # Reset current run timer on every reset
+        self._current_run_elapsed = 0.0
+        self._current_run_base    = 0.0
+
         if keep:
-            self.current_game = 0
-            self.game_state   = "running"
+            self.current_game       = 0
+            self.game_state         = "running"
+            self._current_run_start = time.monotonic()
             if self._timer_start is None:
                 self._start_timer()
+            else:
+                self._current_run_base  = 0.0
+                self._current_run_start = time.monotonic()
+            self.stats["game_splits"] = [0.0] * 15
             self._refresh_images()
             self._refresh_stats()
             self._set_status(f"Reset  —  Running  {self._game_name(0)}")
         else:
             self._pause_timer()
-            self.game_state   = "idle"
-            self.current_game = -1
-            self._elapsed       = 0.0
-            self._elapsed_base  = 0.0
-            self._timer_start   = None
+            self.game_state         = "idle"
+            self.current_game       = -1
+            self._elapsed           = 0.0
+            self._elapsed_base      = 0.0
+            self._timer_start       = None
+            self._current_run_start = None
+            self.stats["game_splits"] = [0.0] * 15
             self._refresh_images()
             self._refresh_stats()
             self._set_status("Reset  —  Press Start or Space to begin")
@@ -617,11 +690,16 @@ class App:
         ):
             return
         self._pause_timer()
-        self.game_state   = "idle"
-        self.current_game = -1
-        self._elapsed = self._elapsed_base = 0.0
-        self._timer_start = None
-        self.stats["reset_count"] = self.stats["timer_seconds"] = 0
+        self.game_state           = "idle"
+        self.current_game         = -1
+        self._elapsed             = self._elapsed_base = 0.0
+        self._timer_start         = None
+        self._current_run_elapsed = 0.0
+        self._current_run_base    = 0.0
+        self._current_run_start   = None
+        self.stats["reset_count"]   = 0
+        self.stats["timer_seconds"] = 0
+        self.stats["game_splits"]   = [0.0] * 15
         self._save_stats()
         self._refresh_images()
         self._refresh_stats()
@@ -759,8 +837,6 @@ class App:
 
         res_frame.bind("<Configure>", _on_res_cfg)
         res_canvas.bind("<Configure>", _on_res_canvas_cfg)
-        res_canvas.bind("<MouseWheel>",
-                        lambda e: res_canvas.yview_scroll(-1 * (e.delta // 120), "units"))
 
         # Placeholder thumbnail
         _placeholder = Image.new("RGB", (THUMB_W, THUMB_H), (35, 35, 65))
@@ -782,6 +858,7 @@ class App:
                 tk.Label(res_frame, text="No results found.",
                          fg="#888aaa", bg=B,
                          font=("Segoe UI", 11, "italic")).pack(pady=30)
+                dlg.after(50, lambda: _bind_scroll(res_frame, res_canvas))
                 return
 
             status_var.set(f"{len(results)} result(s) — click a cover to assign")
@@ -837,6 +914,8 @@ class App:
                             pass
 
                     threading.Thread(target=_load_thumb, daemon=True).start()
+
+            dlg.after(50, lambda: _bind_scroll(res_frame, res_canvas))
 
         def assign_game(game: dict) -> None:
             name_var.set(game.get("name", name_var.get()))
@@ -894,6 +973,9 @@ class App:
         # Kick off a search immediately if there's a pre-filled name
         if query_var.get().strip():
             dlg.after(100, do_search)
+
+        dlg.update_idletasks()
+        _bind_scroll(res_frame, res_canvas)
 
     # ── Settings window ───────────────────────────────────────────────────────
 
