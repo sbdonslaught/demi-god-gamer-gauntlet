@@ -80,6 +80,8 @@ DEFAULT_SETTINGS: dict = {
     "game_names":             _DEFAULT_GAME_NAMES.copy(),
     "game_title_font_size":   9,
     "game_title_font_color":  "#7777bb",
+    "split_font_size":        10,
+    "split_font_color":       "#ffffff",
     "igdb_client_id":         "",
     "igdb_client_secret":     "",
     "game_image_ids":         _DEFAULT_IMAGE_IDS.copy(),
@@ -302,6 +304,8 @@ class App:
         names  = self.settings.get("game_names", DEFAULT_SETTINGS["game_names"])
         tsize  = self.settings.get("game_title_font_size", 9)
         tcolor = self.settings.get("game_title_font_color", "#7777bb")
+        ssize  = self.settings.get("split_font_size", 10)
+        scolor = self.settings.get("split_font_color", "#ffffff")
 
         for i, gf in enumerate(self.game_frames):
             if self.game_state == "done" or i < self.current_game:
@@ -331,9 +335,11 @@ class App:
 
             splits = self.stats.get("game_splits", [])
             if state == "done" and i < len(splits) and splits[i] > 0:
-                gf["split_lbl"].configure(text=_fmt_time(splits[i]), bg=bg)
+                gf["split_lbl"].configure(text=_fmt_time(splits[i]), bg=bg,
+                                          fg=scolor, font=("Consolas", ssize, "bold"))
             else:
-                gf["split_lbl"].configure(text="", bg=bg)
+                gf["split_lbl"].configure(text="", bg=bg,
+                                          fg=scolor, font=("Consolas", ssize, "bold"))
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
@@ -401,7 +407,7 @@ class App:
         rcolor = self.settings.get("resets_font_color", "#ff9f43")
 
         self.timer_lbl = tk.Label(
-            self._stats_bar, text="⏱  00:00:00",
+            self._stats_bar, text="⏱ 00:00:00",
             font=("Consolas", tsize, "bold"), fg=tcolor, bg=bg,
         )
         self.resets_lbl = tk.Label(
@@ -409,7 +415,7 @@ class App:
             font=("Segoe UI", rsize, "bold"), fg=rcolor, bg=bg,
         )
         self.current_run_lbl = tk.Label(
-            self._stats_bar, text="🎮  Run: 00:00:00",
+            self._stats_bar, text="🎮 Run: 00:00:00",
             font=("Consolas", tsize, "bold"), fg="#a29bfe", bg=bg,
         )
         self.timer_lbl.pack(side="left", padx=(0, 20))
@@ -440,7 +446,9 @@ class App:
             num    = tk.Label(col, text=f"Game {i + 1}",
                               font=("Segoe UI", 9, "bold"), fg="#555577", bg=bg)
             num.pack(pady=(3, 0))
-            split_lbl = tk.Label(col, text="", font=("Consolas", 8), fg="#55aa55", bg=bg)
+            ssize  = self.settings.get("split_font_size", 10)
+            scolor = self.settings.get("split_font_color", "#ffffff")
+            split_lbl = tk.Label(col, text="", font=("Consolas", ssize, "bold"), fg=scolor, bg=bg)
             split_lbl.pack()
             self.game_frames.append({
                 "col": col, "border": border, "inner": inner,
@@ -479,13 +487,13 @@ class App:
         e = self._elapsed
         h, rem = divmod(int(e), 3600)
         m, s   = divmod(rem, 60)
-        self.timer_lbl.configure(text=f"⏱  {h:02d}:{m:02d}:{s:02d}")
-        self.resets_lbl.configure(text=f"↺  Resets: {self.stats.get('reset_count', 0)}")
+        self.timer_lbl.configure(text=f"⏱ {h:02d}:{m:02d}:{s:02d}")
+        self.resets_lbl.configure(text=f"↺ Resets: {self.stats.get('reset_count', 0)}")
 
         cr = self._current_run_elapsed
         crh, crrem = divmod(int(cr), 3600)
         crm, crs   = divmod(crrem, 60)
-        self.current_run_lbl.configure(text=f"🎮  Run: {crh:02d}:{crm:02d}:{crs:02d}")
+        self.current_run_lbl.configure(text=f"🎮 Run: {crh:02d}:{crm:02d}:{crs:02d}")
 
         self.timer_lbl.pack_forget()
         self.resets_lbl.pack_forget()
@@ -600,7 +608,7 @@ class App:
     def _record_split(self, game_index: int) -> None:
         splits = self.stats.get("game_splits", [0.0] * 15)
         prior  = sum(splits[:game_index])
-        splits[game_index] = max(0.0, self._elapsed - prior)
+        splits[game_index] = max(0.0, self._current_run_elapsed - prior)
         self.stats["game_splits"] = splits
         self._save_stats()
 
@@ -609,10 +617,6 @@ class App:
             return
         # Record split for the game just completed
         self._record_split(self.current_game)
-        # Reset current run timer for next game
-        self._current_run_elapsed = 0.0
-        self._current_run_base    = 0.0
-        self._current_run_start   = time.monotonic() if self.game_state == "running" else None
 
         if self.current_game >= self.num_games - 1:
             self.game_state = "done"
@@ -1189,6 +1193,18 @@ class App:
         gt_color    = colour_picker(gt_f, "Colour:",
                                     self.settings.get("game_title_font_color", "#7777bb"))
 
+        # ── SPLIT TIME STYLE ───────────────────────────────────────
+        section_hdr("SPLIT TIME STYLE")
+        tk.Label(inner_frame,
+                 text="  Time shown below each completed game title.",
+                 fg="#666688", bg=B, font=("Segoe UI", 8, "italic"),
+                 anchor="w").pack(fill="x", padx=16)
+        sp_f = tk.Frame(inner_frame, bg=B)
+        sp_f.pack(fill="x", padx=16, pady=6)
+        sp_size_var = size_spin(sp_f, self.settings.get("split_font_size", 10))
+        sp_color    = colour_picker(sp_f, "Colour:",
+                                    self.settings.get("split_font_color", "#ffffff"))
+
         # ── IGDB CREDENTIALS ───────────────────────────────────────
         section_hdr("IGDB CREDENTIALS")
         tk.Label(inner_frame,
@@ -1320,6 +1336,8 @@ class App:
             self.settings["game_names"]            = [v.get() for v in name_vars]
             self.settings["game_title_font_size"]  = gt_size_var.get()
             self.settings["game_title_font_color"] = gt_color[0]
+            self.settings["split_font_size"]       = sp_size_var.get()
+            self.settings["split_font_color"]      = sp_color[0]
             self.settings["igdb_client_id"]        = cid_var.get().strip()
             self.settings["igdb_client_secret"]    = cs_var.get().strip()
             # game_image_ids are written directly by assign_game / not exposed here
